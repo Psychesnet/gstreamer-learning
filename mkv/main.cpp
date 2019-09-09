@@ -15,6 +15,17 @@ static void on_pad_added(GstElement *element, GstPad *pad, gpointer data)
     gst_object_unref(sinkpad);
 }
 
+static gboolean cb_print_position(GstElement *pipeline)
+{
+    gint64 pos, len;
+    if (gst_element_query_position(pipeline, GST_FORMAT_TIME, &pos) &&
+            gst_element_query_duration(pipeline, GST_FORMAT_TIME, &len)) {
+        g_print("Time: %" GST_TIME_FORMAT " / %" GST_TIME_FORMAT "\n",
+                GST_TIME_ARGS(pos), GST_TIME_ARGS(len));
+    }
+    return TRUE;
+}
+
 int main(int argc, char *argv[])
 {
     GMainLoop *loop;
@@ -50,6 +61,9 @@ int main(int argc, char *argv[])
     gst_element_link_many(source, demux, NULL);
     gst_element_link_many(h264_queue, parser, decoder, raw_queue, sink, NULL);
     g_signal_connect(demux, "pad-added", G_CALLBACK(on_pad_added), h264_queue);
+
+    // let's add duration event callback
+    g_timeout_add(200, (GSourceFunc)cb_print_position, pipeline);
     g_printerr("Now playing %s\n", argv[1]);
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
     g_main_loop_run(loop);
