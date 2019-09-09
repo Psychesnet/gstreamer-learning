@@ -5,6 +5,16 @@
 #include <gst/gst.h>
 #include <glib.h>
 
+static void on_pad_added(GstElement *element, GstPad *pad, gpointer data)
+{
+    GstPad *sinkpad;
+    GstElement *queue = (GstElement *)data;
+    g_print("Dynamic pad created, linking demuxer/queue\n");
+    sinkpad = gst_element_get_static_pad(queue, "sink");
+    gst_pad_link(pad, sinkpad);
+    gst_object_unref(sinkpad);
+}
+
 int main(int argc, char *argv[])
 {
     GMainLoop *loop;
@@ -36,8 +46,10 @@ int main(int argc, char *argv[])
     g_object_set(G_OBJECT(source), "location", argv[1]);
     gst_bin_add_many(GST_BIN(pipeline),
             source, demux, h264_queue, parser, decoder, raw_queue, sink, NULL);
-    gst_element_link_many(source, demux, h264_queue,
-            parser, decoder, raw_queue, sink, NULL);
+    // dont link demux and queue, because demux's output with various meta, need use pad to activate
+    gst_element_link_many(source, demux, NULL);
+    gst_element_link_many(h264_queue, parser, decoder, raw_queue, sink, NULL);
+    g_signal_connect(demux, "pad-added", G_CALLBACK(on_pad_added), h264_queue);
     g_printerr("Now playing %s\n", argv[1]);
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
     g_main_loop_run(loop);
