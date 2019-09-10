@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     signal_register();
 
     GMainLoop *loop;
-    GstElement *source, *demux, *h264_queue, *parser, *decoder, *raw_queue, *sink;
+    GstElement *source, *demux, *h264_queue, *parser, *decoder, *convert, *raw_queue, *sink;
     GstBus *bus;
     guint bus_watch_id;
 
@@ -114,21 +114,22 @@ int main(int argc, char *argv[])
     demux = gst_element_factory_make("qtdemux", "demuxer");
     h264_queue = gst_element_factory_make("queue", "hqueue");
     parser = gst_element_factory_make("h264parse", "hparser");
-    decoder = gst_element_factory_make("mppvideodec", "vdecoder");
+    decoder = gst_element_factory_make("avdec_h264", "vdecoder");
+    convert = gst_element_factory_make("videoconvert", "vconvert");
     raw_queue = gst_element_factory_make("queue", "rqueue");
     sink = gst_element_factory_make("kmssink", "vsink");
 
-    if (!pipeline || !source || !demux || !h264_queue || !parser || !decoder || !raw_queue || !sink) {
+    if (!pipeline || !source || !demux || !h264_queue || !parser || !decoder || !convert || !raw_queue || !sink) {
         g_printerr("One element could not be created. Exiting....\n");
         return -1;
     }
 
     g_object_set(G_OBJECT(source), "location", argv[1]);
     gst_bin_add_many(GST_BIN(pipeline),
-            source, demux, h264_queue, parser, decoder, raw_queue, sink, NULL);
+            source, demux, h264_queue, parser, decoder, convert, raw_queue, sink, NULL);
     // dont link demux and queue, because demux's output with various meta, need use pad to activate
     gst_element_link_many(source, demux, NULL);
-    gst_element_link_many(h264_queue, parser, decoder, raw_queue, sink, NULL);
+    gst_element_link_many(h264_queue, parser, decoder, convert, raw_queue, sink, NULL);
     g_signal_connect(demux, "pad-added", G_CALLBACK(on_pad_added), h264_queue);
 
     // let's add duration event callback
